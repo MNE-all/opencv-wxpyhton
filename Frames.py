@@ -77,6 +77,12 @@ class MainFrame(wx.Frame):
         elif self.redBox.GetValue():
             for i in range(self.amount):
                 self.campanels[i].VideoMode = "red"
+        elif self.greenBox.GetValue():
+            for i in range(self.amount):
+                self.campanels[i].VideoMode = "green"
+        elif self.blueBox.GetValue():
+            for i in range(self.amount):
+                self.campanels[i].VideoMode = "blue"
         else:
             for i in range(self.amount):
                 self.campanels[i].VideoMode = "default"
@@ -164,12 +170,15 @@ class VideoFrame(wx.Panel):
             frame = cv2.resize(frame, (self.width, self.height))
             if self.videoMode == "default":
                 vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
             elif self.videoMode == "gray":
-                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
                 vframe = cv2.GaussianBlur(vframe, (9, 9), 0)
             elif self.videoMode == "red":
-                pass
+                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
+            elif self.videoMode == "green":
+                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+            elif self.videoMode == "blue":
+                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LUV)
             vframe = cv2.putText(
                 vframe, self.camNum, (self.Width - 100, self.Height - 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (10, 10, 10), 2, cv2.LINE_AA)
             self.bmp.CopyFromBuffer(vframe)
