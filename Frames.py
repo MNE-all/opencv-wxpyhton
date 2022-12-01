@@ -1,6 +1,7 @@
 import cv2
 import wx
 import math
+import numpy as np
 
 
 class MainFrame(wx.Frame):
@@ -37,7 +38,7 @@ class MainFrame(wx.Frame):
 
         vbox.Add(hbox, flag=wx.EXPAND | wx.DOWN, border=2)
 
-        # Считает количество подклюшенных камер
+        # Считает количество подключенных камер
         self.cap = []
         max_tested = 100
         for i in range(max_tested):
@@ -124,6 +125,7 @@ class VideoFrame(wx.Panel):
         ret, frame = self.capture.read()
         frame = cv2.resize(frame, (self.width, self.height), cv2.INTER_NEAREST)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
         self.bmp = wx.BitmapFromBuffer(self.width, self.height, frame)
         self.timer = wx.Timer(self)
         self.timer.Start(1)
@@ -160,7 +162,7 @@ class VideoFrame(wx.Panel):
         self.videoMode = value
 
     def OnPaint(self, evt):
-        dc = wx.BufferedPaintDC(self)
+        dc = wx.PaintDC(self)
         dc.DrawBitmap(self.bmp, 0, 0)
 
     def NextFrame(self, event):
@@ -171,17 +173,18 @@ class VideoFrame(wx.Panel):
             if self.videoMode == "default":
                 vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             elif self.videoMode == "gray":
-                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-                vframe = cv2.GaussianBlur(vframe, (9, 9), 0)
+                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                # vframe = cv2.GaussianBlur(vframe, (9, 9), 0)
             elif self.videoMode == "red":
                 vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
             elif self.videoMode == "green":
                 vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
             elif self.videoMode == "blue":
                 vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LUV)
-            vframe = cv2.putText(
-                vframe, self.camNum, (self.Width - 100, self.Height - 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (10, 10, 10), 2, cv2.LINE_AA)
-            self.bmp.CopyFromBuffer(vframe)
+            vframe = cv2.putText(vframe, self.camNum, (self.Width - 100, self.Height - 70),
+                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (10, 10, 10), 2, cv2.LINE_AA)
+            self.bmp = wx.BitmapFromBuffer(self.width, self.height, vframe)
+            # self.bmp.CopyFromBuffer(vframe)
             self.Refresh()
 
     def Resize(self, event):
