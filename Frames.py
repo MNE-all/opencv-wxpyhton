@@ -7,6 +7,17 @@ import numpy as np
 class MainFrame(wx.Frame):
     def __init__(self, title):
         super().__init__(None, title=title)
+        # Считает количество подключенных камер
+        self.camName = []
+        max_tested = 100
+        for i in range(max_tested):
+            temp_camera = cv2.VideoCapture(i)
+            if temp_camera.isOpened():
+                temp_camera.release()
+                self.camName.append("Камера №" + str(i))
+                continue
+            break
+
         # Window settings
         self.SetBackgroundColour(wx.Colour(0, 170, 200))
         self.Maximize(True)
@@ -25,6 +36,7 @@ class MainFrame(wx.Frame):
 
         vbox = wx.BoxSizer(wx.VERTICAL)
         hbox = wx.BoxSizer(wx.HORIZONTAL)
+
         self.grayBox = wx.CheckBox(panel, label="Gray")
         hbox.Add(self.grayBox, proportion=1, flag=wx.LEFT | wx.UP, border=2)
         self.redBox = wx.CheckBox(panel, label="Red")
@@ -33,37 +45,23 @@ class MainFrame(wx.Frame):
         hbox.Add(self.greenBox, proportion=1, flag=wx.UP, border=2)
         self.blueBox = wx.CheckBox(panel, label="Blue")
         hbox.Add(self.blueBox, proportion=1, flag=wx.UP, border=2)
+
+        self.cameraSelection = wx.ComboBox(panel, pos=(
+            50, 30), choices=self.camName, style=wx.CB_READONLY)
+        self.cameraSelection.SetSelection(0)
+        hbox.Add(self.cameraSelection, proportion=1,
+                 flag=wx.UP, border=2)
+
         self.acceptBtn = wx.Button(panel, label="Принять")
         hbox.Add(self.acceptBtn, proportion=1, flag=wx.UP | wx.RIGHT, border=2)
 
         vbox.Add(hbox, flag=wx.EXPAND | wx.DOWN, border=2)
 
-        # Считает количество подключенных камер
-        self.cap = []
-        max_tested = 100
-        for i in range(max_tested):
-            temp_camera = cv2.VideoCapture(i)
-            if temp_camera.isOpened():
-                temp_camera.release()
-                self.cap.append(cv2.VideoCapture(i))
-                continue
-            self.amount = i
-            break
+        # Панель с камерой
+        self.VideoFrame = VideoFrame(
+            panel, int(self.W), int(self.H))
 
-        # Инициализация таблицы с камерами
-        h, w = hbox.GetSize()
-
-        self.campanels = []
-        self.side = int(math.ceil(math.sqrt(self.amount)))
-        grid = wx.GridSizer(self.side, self.side, 1, 1)
-        for i in range(self.amount):
-            self.cap[i] = cv2.VideoCapture(i)
-            self.campanels.append(VideoFrame(
-                panel, self.cap[i], int(self.W/self.side), int(self.H/self.side - 52), i))
-
-            grid.Add(self.campanels[i], wx.ID_ANY, wx.EXPAND)
-
-        vbox.Add(grid)
+        vbox.Add(self.VideoFrame)
         panel.SetSizer(vbox)
 
         self.acceptBtn.Bind(wx.EVT_BUTTON, self.AcceptVideoMode)
@@ -73,20 +71,18 @@ class MainFrame(wx.Frame):
 
     def AcceptVideoMode(self, event):
         if self.grayBox.GetValue():
-            for i in range(self.amount):
-                self.campanels[i].VideoMode = "gray"
+            self.VideoFrame.VideoMode = "gray"
         elif self.redBox.GetValue():
-            for i in range(self.amount):
-                self.campanels[i].VideoMode = "red"
+            self.VideoFrame.VideoMode = "red"
         elif self.greenBox.GetValue():
-            for i in range(self.amount):
-                self.campanels[i].VideoMode = "green"
+            self.VideoFrame.VideoMode = "green"
         elif self.blueBox.GetValue():
-            for i in range(self.amount):
-                self.campanels[i].VideoMode = "blue"
+            self.VideoFrame.VideoMode = "blue"
         else:
-            for i in range(self.amount):
-                self.campanels[i].VideoMode = "default"
+            self.VideoFrame.VideoMode = "default"
+
+        self.VideoFrame.CamNumber = str.split(
+            self.cameraSelection.Value, '№')[1]
 
     def OnExit(self, event):
         self.Close()
@@ -115,18 +111,12 @@ class MainFrame(wx.Frame):
 
 class VideoFrame(wx.Panel):
 
-    def __init__(self, parent, capture, w, h, camNum):
-        self.camNum = str(camNum)
-        self.videoMode = "default"
+    def __init__(self, parent, w, h):
         wx.Panel.__init__(self, parent, wx.ID_ANY, (0, 0), (w, h))
+        self.startBool = False
+        self.videoMode = "default"
         self.width = int(w)
         self.height = int(h)
-        self.capture = capture
-        ret, frame = self.capture.read()
-        frame = cv2.resize(frame, (self.width, self.height), cv2.INTER_NEAREST)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        self.bmp = wx.BitmapFromBuffer(self.width, self.height, frame)
         self.timer = wx.Timer(self)
         self.timer.Start(1)
 
@@ -161,28 +151,51 @@ class VideoFrame(wx.Panel):
     def VideoMode(self, value):
         self.videoMode = value
 
+    @ property
+    def CamNumber(self):
+        return self.camNum
+
+    @ CamNumber.setter
+    def CamNumber(self, value):
+        self.camNum = str(value)
+        self.capture = cv2.VideoCapture(int(value))
+        self.startBool = True
+
     def OnPaint(self, evt):
         dc = wx.PaintDC(self)
         dc.DrawBitmap(self.bmp, 0, 0)
 
     def NextFrame(self, event):
-        ret, frame = self.capture.read()
-        if ret:
-            b, g, r = cv2.split(frame)
-            frame = cv2.resize(frame, (self.width, self.height))
-            if self.videoMode == "default":
-                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            elif self.videoMode == "gray":
-                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                # vframe = cv2.GaussianBlur(vframe, (9, 9), 0)
-            elif self.videoMode == "red":
-                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
-            elif self.videoMode == "green":
-                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-            elif self.videoMode == "blue":
-                vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LUV)
-            vframe = cv2.putText(vframe, self.camNum, (self.Width - 100, self.Height - 70),
-                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (10, 10, 10), 2, cv2.LINE_AA)
+        if self.startBool:
+            ret, frame = self.capture.read()
+            if ret:
+                # b, g, r = cv2.split(frame)
+                frame = cv2.resize(frame, (self.width, self.height))
+                if self.videoMode == "default":
+                    vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                elif self.videoMode == "gray":
+                    # vframe = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                    vframe = cv2.cvtColor(frame, cv2.IMREAD_GRAYSCALE)
+                    vframe = cv2.threshold(vframe, 127, 255, 0)
+                    # vframe = cv2.GaussianBlur(vframe, (9, 9), 0)
+                elif self.videoMode == "red":
+                    vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
+                elif self.videoMode == "green":
+                    vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+                elif self.videoMode == "blue":
+                    # vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2LUV)
+                    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                    # define range of blue color in HSV
+                    lower_blue = np.array([110, 50, 50])
+                    upper_blue = np.array([130, 255, 255])
+                    # Threshold the HSV image to get only blue colors
+                    mask = cv2.inRange(hsv, lower_blue, upper_blue)
+                    # Bitwise-AND mask and original image
+                    vframe = cv2.bitwise_and(frame, frame, mask=mask)
+                print(vframe.shape)
+                vframe = cv2.putText(vframe, self.camNum, (self.Width - 100, self.Height - 70),
+                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (10, 10, 10), 2, cv2.LINE_AA)
+                vframe = cv2.flip(vframe, 1)
             self.bmp = wx.BitmapFromBuffer(self.width, self.height, vframe)
             # self.bmp.CopyFromBuffer(vframe)
             self.Refresh()
