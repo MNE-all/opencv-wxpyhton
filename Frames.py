@@ -1,5 +1,5 @@
-import cv2
 import wx
+import cv2
 import math
 import numpy as np
 
@@ -7,6 +7,10 @@ import numpy as np
 class MainFrame(wx.Frame):
     def __init__(self, title):
         super().__init__(None, title=title)
+        self.StatusBar = self.CreateStatusBar()
+        self.StatusBar.SetStatusText(
+            "Здесь отобразится последнее применённое действие")
+
         # Считает количество подключенных камер
         self.camName = []
         max_tested = 100
@@ -72,15 +76,22 @@ class MainFrame(wx.Frame):
     def AcceptVideoMode(self, event):
         if self.grayBox.GetValue():
             self.VideoFrame.VideoMode = "gray"
+            mode = "оттенки серого | GRAYSCALE"
         elif self.redBox.GetValue():
             self.VideoFrame.VideoMode = "red"
+            mode = "только красный цвет | RED"
         elif self.greenBox.GetValue():
             self.VideoFrame.VideoMode = "green"
+            mode = "только зелёный цвет | GREEN"
         elif self.blueBox.GetValue():
             self.VideoFrame.VideoMode = "blue"
+            mode = "только синий цвет | BLUE"
         else:
             self.VideoFrame.VideoMode = "default"
+            mode = "все цвета | RGB"
 
+        self.StatusBar.SetStatusText(
+            str(self.cameraSelection.Value) + " была включена в режиме - " + mode)
         self.VideoFrame.CamNumber = str.split(
             self.cameraSelection.Value, '№')[1]
 
