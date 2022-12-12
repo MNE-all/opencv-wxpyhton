@@ -2,6 +2,7 @@ import wx
 import cv2
 import math
 import numpy as np
+from wx.lib.imageutils import grayOut
 
 
 class MainFrame(wx.Frame):
@@ -55,7 +56,8 @@ class MainFrame(wx.Frame):
         hbox.Add(self.greenBox, proportion=1, flag=wx.UP, border=2)
         self.blueBox = wx.CheckBox(panel, label="Blue")
         hbox.Add(self.blueBox, proportion=1, flag=wx.UP, border=2)
-
+        self.faceBox = wx.CheckBox(panel, label="Face")
+        hbox.Add(self.faceBox, proportion=1, flag=wx.UP, border=2)
         self.acceptBtn = wx.Button(panel, label="Принять")
         hbox.Add(self.acceptBtn, proportion=1, flag=wx.UP | wx.RIGHT, border=2)
 
@@ -74,21 +76,28 @@ class MainFrame(wx.Frame):
         self.Show()
 
     def AcceptVideoMode(self, event):
+        if self.faceBox.GetValue():
+            self.VideoFrame.FaceBool = True
+            mode = "обнаружение лиц, "
+        else:
+            self.VideoFrame.FaceBool = False
+            mode = ""
+
         if self.grayBox.GetValue():
             self.VideoFrame.VideoMode = "gray"
-            mode = "оттенки серого | GRAYSCALE"
+            mode += "оттенки серого | GRAYSCALE"
         elif self.redBox.GetValue():
             self.VideoFrame.VideoMode = "red"
-            mode = "только красный цвет | RED"
+            mode += "только красный цвет | RED"
         elif self.greenBox.GetValue():
             self.VideoFrame.VideoMode = "green"
-            mode = "только зелёный цвет | GREEN"
+            mode += "только зелёный цвет | GREEN"
         elif self.blueBox.GetValue():
             self.VideoFrame.VideoMode = "blue"
-            mode = "только синий цвет | BLUE"
+            mode += "только синий цвет | BLUE"
         else:
             self.VideoFrame.VideoMode = "default"
-            mode = "все цвета | RGB"
+            mode += "все цвета | RGB"
 
         self.StatusBar.SetStatusText(
             str(self.cameraSelection.Value) + " была включена в режиме - " + mode)
@@ -135,6 +144,16 @@ class VideoFrame(wx.Panel):
         self.Bind(wx.EVT_TIMER, self.NextFrame)
 
         self.Bind(wx.EVT_SIZE, self.Resize)
+        self.faceModel = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+
+    @ property
+    def FaceBool(self):
+        return self.faceBool
+
+    @ FaceBool.setter
+    def FaceBool(self, value):
+        self.faceBool = value
 
     @ property
     def Width(self):
@@ -185,7 +204,17 @@ class VideoFrame(wx.Panel):
                 if self.videoMode == "default":
                     vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 elif self.videoMode == "gray":
-                    vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    vframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                    # Ужасно медленный вариант
+                    # for i in range(self.height):
+                    #     for j in range(self.width):
+                    #         blue = vframe[i, j, 0]
+                    #         green = vframe[i, j, 1]
+                    #         red = vframe[i, j, 2]
+                    #         grayscale = blue * 0.114 + green * 0.587 + red * 0.299
+                    #         vframe[i, j] = grayscale
+
                 elif self.videoMode == "red":
                     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
                     lower_red = np.array([-10, 50, 50])
@@ -210,12 +239,19 @@ class VideoFrame(wx.Panel):
                     # Bitwise-AND mask and original image
                     vframe = cv2.bitwise_and(frame, frame, mask=mask)
                     vframe = cv2.cvtColor(vframe, cv2.COLOR_BGR2RGB)
-                print(vframe.shape)
+
+                if self.FaceBool:
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    faces = self.faceModel.detectMultiScale(gray, 1.1, 19)
+                    for (x, y, w, h) in faces:
+                        cv2.rectangle(vframe, (x, y),
+                                      (x+w, y+h), (0, 255, 0), 2)
+
+                # print(vframe.shape)
                 vframe = cv2.putText(vframe, self.camNum, (self.Width - 100, self.Height - 70),
                                      cv2.FONT_HERSHEY_SIMPLEX, 1, (10, 10, 10), 2, cv2.LINE_AA)
                 # vframe = cv2.flip(vframe, 1)
                 self.bmp = wx.BitmapFromBuffer(self.width, self.height, vframe)
-            # self.bmp.CopyFromBuffer(vframe)
             self.Refresh()
 
     def Resize(self, event):
